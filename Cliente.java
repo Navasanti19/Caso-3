@@ -25,6 +25,7 @@ public class Cliente extends Thread{
 
 	private final String serverAddress;
     private final int serverPort;
+	@SuppressWarnings("unused")
 	private final int id;
 
 	public Cliente(String serverAddress, int serverPort, int id) {
