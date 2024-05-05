@@ -34,7 +34,9 @@ public class Cliente extends Thread{
 		this.id = id;
     }
 	public void run(){
-		String mensajito = "SECURE INIT CLIENTE";
+
+		BigInteger reto = new BigInteger(SecureRandom.getSeed(1024));
+		String mensajito = reto.toString();
 
 		Socket socket = null;
 		PrintWriter escritor = null;
@@ -147,21 +149,24 @@ public class Cliente extends Thread{
 
 			System.out.println("PASO 11a: CALCULAR LLAVES");
 			gxy = gx.modPow(y, p);
-
-			MessageDigest md = MessageDigest.getInstance("SHA-256");
-			byte[] contextoBytes = "K_AB1".getBytes();
-			md.update(contextoBytes);
 			byte[] sharedSecret = gxy.toByteArray();
-			byte[] claveDerivada = md.digest(sharedSecret);
 
-			SecretKey kAB1 = new SecretKeySpec(claveDerivada, "AES");
-
-			md = MessageDigest.getInstance("SHA-256");
-			contextoBytes = "K_AB2".getBytes();
-			md.update(contextoBytes);
-			claveDerivada = md.digest(sharedSecret);
-
-			SecretKey kAB2 = new SecretKeySpec(claveDerivada, "HmacSHA256");
+			// Usar SHA-512 para obtener un hash más largo
+            MessageDigest md = MessageDigest.getInstance("SHA-512");
+            
+            // Primer clave derivada para kAB1
+            md.update("K_AB".getBytes());
+            byte[] claveDerivadaTotal = md.digest(sharedSecret);
+            
+            // Dividir el hash en dos partes iguales
+            byte[] claveDerivada1 = new byte[claveDerivadaTotal.length / 2];
+            byte[] claveDerivada2 = new byte[claveDerivadaTotal.length / 2];
+            System.arraycopy(claveDerivadaTotal, 0, claveDerivada1, 0, claveDerivadaTotal.length / 2);
+            System.arraycopy(claveDerivadaTotal, claveDerivadaTotal.length / 2, claveDerivada2, 0, claveDerivadaTotal.length / 2);
+            
+            // Crear dos claves simétricas
+            SecretKey kAB1 = new SecretKeySpec(claveDerivada1, "AES");
+            SecretKey kAB2 = new SecretKeySpec(claveDerivada2, "HmacSHA256");
 
 			String continuar = lector.readLine();
 			if (!continuar.equals("CONTINUAR")) {
@@ -204,7 +209,10 @@ public class Cliente extends Thread{
 			}
 
 			startTime = System.nanoTime();
-			String consulta = "SELECT * FROM USUARIOS";
+			BigInteger numConsulta = new BigInteger(SecureRandom.getSeed(2));
+			int numInt = numConsulta.intValueExact();
+			
+			String consulta = numConsulta.toString();
 
 			byte[] consultaCifrado = cifrador.doFinal(consulta.getBytes());
 			String consultaCifradoFinal = Base64.getEncoder().encodeToString(consultaCifrado);
@@ -243,11 +251,12 @@ public class Cliente extends Thread{
 			startTime = System.nanoTime();
 			byte[] hmacCalculado = mac.doFinal(respuestaDescifrada.getBytes());
 
-			if (Arrays.equals(hmacRecibidoBytes, hmacCalculado)) {
+			if (Arrays.equals(hmacRecibidoBytes, hmacCalculado) && respuestaDescifrada.equals(String.valueOf(numInt - 1))) {
 				System.out.println("TODO BIEN EXCELENTE");
 			} else {
 				System.out.println("Error: La respuesta ha sido alterada o el HMAC no coincide.");
 			}
+
 			endTime = System.nanoTime();
 			ClienteGrande.timeVerifyAuthCode.addAndGet(endTime - startTime);
 

@@ -24,7 +24,6 @@ public class ServidorGrande {
         Files.write(Paths.get("publicKey.key"), publicKeyBytes);
         System.out.println("Public key saved to publicKey.key");
 
-        // POOL DE SERVIDORES
         ServerSocket serverSocket = new ServerSocket(port);
         while (true) {
             Socket clientSocket = serverSocket.accept();

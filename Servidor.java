@@ -3,6 +3,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -132,18 +133,24 @@ public class Servidor extends Thread {
 
 			gxy = gy.modPow(x, p);
 
-			MessageDigest md = MessageDigest.getInstance("SHA-256");
-			byte[] contextoBytes = "K_AB1".getBytes();
-			md.update(contextoBytes);
 			byte[] sharedSecret = gxy.toByteArray();
-			byte[] claveDerivada = md.digest(sharedSecret);
-			SecretKey kAB1 = new SecretKeySpec(claveDerivada, "AES");
 
-			md = MessageDigest.getInstance("SHA-256");
-			contextoBytes = "K_AB2".getBytes();
-			md.update(contextoBytes);
-			claveDerivada = md.digest(sharedSecret);
-			SecretKey kAB2 = new SecretKeySpec(claveDerivada, "HmacSHA256");
+			// Usar SHA-512 para obtener un hash más largo
+            MessageDigest md = MessageDigest.getInstance("SHA-512");
+            
+            // Primer clave derivada para kAB1
+            md.update("K_AB".getBytes());
+            byte[] claveDerivadaTotal = md.digest(sharedSecret);
+            
+            // Dividir el hash en dos partes iguales
+            byte[] claveDerivada1 = new byte[claveDerivadaTotal.length / 2];
+            byte[] claveDerivada2 = new byte[claveDerivadaTotal.length / 2];
+            System.arraycopy(claveDerivadaTotal, 0, claveDerivada1, 0, claveDerivadaTotal.length / 2);
+            System.arraycopy(claveDerivadaTotal, claveDerivadaTotal.length / 2, claveDerivada2, 0, claveDerivadaTotal.length / 2);
+            
+            // Crear dos claves simétricas
+            SecretKey kAB1 = new SecretKeySpec(claveDerivada1, "AES");
+            SecretKey kAB2 = new SecretKeySpec(claveDerivada2, "HmacSHA256");
 			
 			// ------------------ PASO 12 ------------------------------
 
@@ -190,11 +197,20 @@ public class Servidor extends Thread {
 			String consulta = lector.readLine();
 			String hmacRecibido = lector.readLine();
 
+			// Descifrar la consulta
+            descifrador = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            descifrador.init(Cipher.DECRYPT_MODE, kAB1, new IvParameterSpec(ivBytes));
+            byte[] consultaDescifradaBytes = descifrador.doFinal(Base64.getDecoder().decode(consulta));
+            String consultaDescifrada = new String(consultaDescifradaBytes, StandardCharsets.UTF_8);
+
+			int numeroConsulta = Integer.parseInt(consultaDescifrada);
+            int respuesta = numeroConsulta - 1;
+
+			String respuestaConsulta = String.valueOf(respuesta);
+
 			
 			Cipher cifrador = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cifrador.init(Cipher.ENCRYPT_MODE, kAB1, new IvParameterSpec(ivBytes));
-
-			String respuestaConsulta = "Los Usuarios son: Santiago, Andrea y Luis";
 
 			byte[] respuestaConsultaCifrado = cifrador.doFinal(respuestaConsulta.getBytes());
 			String respuestaConsultaCifradoFinal = Base64.getEncoder().encodeToString(respuestaConsultaCifrado);
